@@ -272,7 +272,8 @@ import {
   RemoveOutline,
   DownloadOutline,
   AppsOutline,
-  ChatbubbleOutline
+  ChatbubbleOutline,
+  MusicalNotesOutline
 } from '@vicons/ionicons5'
 import { nodes, edges, addNode, addNodes, addEdge, addEdges, updateNode, initSampleData, loadProject, saveProject, clearCanvas, canvasViewport, updateViewport, undo, redo, canUndo, canRedo, manualSaveHistory, startBatchOperation, endBatchOperation } from '../stores/canvas'
 import { loadAllModels } from '../stores/models'
@@ -344,6 +345,7 @@ import VideoNode from '../components/nodes/VideoNode.vue'
 import ImageNode from '../components/nodes/ImageNode.vue'
 import VideoConfigNode from '../components/nodes/VideoConfigNode.vue'
 import LLMConfigNode from '../components/nodes/LLMConfigNode.vue'
+import AudioNode from '../components/nodes/AudioNode.vue'
 import ImageRoleEdge from '../components/edges/ImageRoleEdge.vue'
 import PromptOrderEdge from '../components/edges/PromptOrderEdge.vue'
 import ImageOrderEdge from '../components/edges/ImageOrderEdge.vue'
@@ -360,6 +362,7 @@ const nodeTypes = {
   imageConfig: markRaw(ImageConfigNode),
   video: markRaw(VideoNode),
   image: markRaw(ImageNode),
+  audio: markRaw(AudioNode),
   videoConfig: markRaw(VideoConfigNode),
   llmConfig: markRaw(LLMConfigNode)
 }
@@ -393,7 +396,7 @@ const renameValue = ref('')
 // Check if has downloadable assets | 检查是否有可下载素材
 const hasDownloadableAssets = computed(() => {
   return nodes.value.some(n => 
-    (n.type === 'image' || n.type === 'video') && n.data?.url
+    (n.type === 'image' || n.type === 'video' || n.type === 'audio') && n.data?.url
   )
 })
 
@@ -415,6 +418,7 @@ const projectOptions = [
 const tools = [
   { id: 'text', name: '文本', icon: TextOutline, action: () => addNewNode('text') },
   { id: 'image', name: '图片', icon: ImageOutline, action: () => addNewNode('image') },
+  { id: 'audio', name: '音频', icon: MusicalNotesOutline, action: () => addNewNode('audio') },
   { id: 'imageConfig', name: '文生图', icon: ColorPaletteOutline, action: () => addNewNode('imageConfig') },
   { id: 'videoConfig', name: '视频生成', icon: VideocamOutline, action: () => addNewNode('videoConfig') },
   { id: 'undo', name: '撤销', icon: ArrowUndoOutline, action: () => undo(), disabled: () => !canUndo() },
@@ -428,6 +432,7 @@ const nodeTypeOptions = [
   { type: 'imageConfig', name: '文生图配置', icon: ColorPaletteOutline, color: '#22c55e' },
   { type: 'videoConfig', name: '视频生成配置', icon: VideocamOutline, color: '#f59e0b' },
   { type: 'image', name: '图片节点', icon: ImageOutline, color: '#8b5cf6' },
+  { type: 'audio', name: '音频节点', icon: MusicalNotesOutline, color: '#14b8a6' },
   { type: 'video', name: '视频节点', icon: VideocamOutline, color: '#ef4444' }
 ]
 
@@ -529,6 +534,11 @@ const onConnect = (params) => {
       ...params,
       type: 'imageRole',
       data: { imageRole: 'first_frame_image' } // Default to first frame | 默认首帧
+    })
+  } else if (sourceNode?.type === 'audio' && targetNode?.type === 'videoConfig') {
+    addEdge({
+      ...params,
+      data: { audioRole: 'reference_audio' }
     })
   } else if (sourceNode?.type === 'text' && targetNode?.type === 'imageConfig') {
     // Use promptOrder edge type | 使用提示词顺序边类型

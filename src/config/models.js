@@ -63,7 +63,7 @@ export const IMAGE_MODELS = [
     {
         label: 'Nano Banana Pro',
         key: 'nano-banana-pro',
-        provider: ['chatfire'], // 火宝渠道
+        provider: ['chatfire', 'volc'], // 火宝/火山渠道
         sizes: BANANA_SIZE_OPTIONS.map(s => s.key),
         // qualities: SEEDREAM_QUALITY_OPTIONS,
         // getSizesByQuality: (quality) => quality === '4k' ? SEEDREAM_4K_SIZE_OPTIONS : SEEDREAM_SIZE_OPTIONS,
@@ -122,7 +122,7 @@ export const VIDEO_MODELS = [
     {
         label: 'Seedance 1.5 Pro (图文视频)',
         key: 'doubao-seedance-1-5-pro-251215',
-        provider: ['chatfire'],
+        provider: ['chatfire', 'volc'],
         type: 't2v+i2v',
         ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'],
         durs: [{ label: '5 秒', key: 5 }, { label: '10 秒', key: 10 }],
@@ -134,7 +134,7 @@ export const VIDEO_MODELS = [
     {
         label: 'Seedance 1.0 Lite (文生视频)',
         key: 'doubao-seedance-1-0-lite-t2v-250428',
-        provider: ['chatfire'],
+        provider: ['chatfire', 'volc'],
         type: 't2v', // 文生视频
         ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'],
         durs: [{ label: '5 秒', key: 5 }, { label: '10 秒', key: 10 }],
@@ -146,7 +146,7 @@ export const VIDEO_MODELS = [
     {
         label: 'Seedance 1.0 Lite (图生视频)',
         key: 'doubao-seedance-1-0-lite-i2v-250428',
-        provider: ['chatfire'],
+        provider: ['chatfire', 'volc'],
         type: 'i2v', // 图生视频
         ratios: ['16:9'],
         durs: [{ label: '5 秒', key: 5 }, { label: '10 秒', key: 10 }],
@@ -158,7 +158,7 @@ export const VIDEO_MODELS = [
     {
         label: 'Seedance 1.0 Pro (图文视频)',
         key: 'doubao-seedance-1-0-pro-250528',
-        provider: ['chatfire'],
+        provider: ['chatfire', 'volc'],
         type: 't2v+i2v', // 图文视频
         ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', '16:9'],
         durs: [{ label: '5 秒', key: 5 }, { label: '10 秒', key: 10 }],
@@ -171,7 +171,7 @@ export const VIDEO_MODELS = [
     {
         label: 'Seedance 1.0 Pro Fast (图文视频)',
         key: 'doubao-seedance-1-0-pro-fast-251015',
-        provider: ['chatfire'],
+        provider: ['chatfire', 'volc'],
         type: 't2v+i2v',
         ratios: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'],
         durs: [{ label: '5 秒', key: 5 }, { label: '10 秒', key: 10 }],
@@ -222,7 +222,7 @@ export const CHAT_MODELS = [
     { label: 'GPT-4o', key: 'gpt-4o', provider: ['openai'] },
     { label: 'GPT-5.2', key: 'gpt-5.2', provider: ['openai'] },
     { label: 'DeepSeek Chat', key: 'deepseek-chat', provider: ['openai', 'chatfire'] },
-    { label: '豆包 Seed Flash', key: 'doubao-seed-1-6-flash-250615', provider: ['chatfire'] },
+    { label: '豆包 Seed Flash', key: 'doubao-seed-1-6-flash-250615', provider: ['chatfire', 'volc'] },
     { label: 'Gemini 3 Pro', key: 'gemini-3-pro', provider: ['openai'] }
 ]
 

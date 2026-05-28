@@ -93,6 +93,10 @@
             :class="imagesByRole.referenceImages.length > 0 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'">
             参考图 {{ imagesByRole.referenceImages.length > 0 ? `✓ ${imagesByRole.referenceImages.length}` : '○' }}
           </span>
+          <span class="px-2 py-0.5 rounded-full"
+            :class="connectedAudio ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'">
+            音频 {{ connectedAudio ? '✓' : '○' }}
+          </span>
         </div>
 
         <!-- Progress bar | 进度条 -->
@@ -290,6 +294,7 @@ const getConnectedInputs = () => {
   let prompt = ''
   let first_frame_image = ''
   let last_frame_image = ''
+  let reference_audio = ''
   const images = [] // input_reference images | 参考图
 
   for (const edge of connectedEdges) {
@@ -313,15 +318,21 @@ const getConnectedInputs = () => {
       } else if (role === 'input_reference') {
         images.push(imageData)
       }
+    } else if (sourceNode.type === 'audio' && sourceNode.data?.url) {
+      reference_audio = sourceNode.data.base64 || sourceNode.data.url
     }
   }
 
-  return { prompt, first_frame_image, last_frame_image, images }
+  return { prompt, first_frame_image, last_frame_image, images, reference_audio }
 }
 
 // Computed connected prompt | 计算连接的提示词
 const connectedPrompt = computed(() => {
   return getConnectedInputs().prompt
+})
+
+const connectedAudio = computed(() => {
+  return !!getConnectedInputs().reference_audio
 })
 
 // Created video node ID | 创建的视频节点 ID
@@ -332,9 +343,9 @@ const handleGenerate = async () => {
   // 设置生成中状态
   isGenerating.value = true
 
-  const { prompt, first_frame_image, last_frame_image, images } = getConnectedInputs()
+  const { prompt, first_frame_image, last_frame_image, images, reference_audio } = getConnectedInputs()
 
-  const hasInput = prompt || first_frame_image || last_frame_image || images.length > 0
+  const hasInput = prompt || first_frame_image || last_frame_image || images.length > 0 || reference_audio
   if (!hasInput) {
     window.$message?.warning('请先连接文本节点或图片节点')
     isGenerating.value = false
@@ -398,6 +409,11 @@ const handleGenerate = async () => {
     // Add reference images (input_reference) | 添加参考图
     if (images.length > 0) {
       params.images = images
+    }
+
+    // Add reference audio | 添加参考音频
+    if (reference_audio) {
+      params.reference_audio = reference_audio
     }
 
     // Add ratio/size | 添加比例参数

@@ -3,6 +3,189 @@
  * 适配不同 API 提供商的请求参数和响应格式
  */
 
+const adaptChatRequest = (params) => {
+  const adapted = {
+    model: params.model,
+    messages: params.messages
+  }
+  if (params.temperature !== undefined) adapted.temperature = params.temperature
+  if (params.max_tokens !== undefined) adapted.max_tokens = params.max_tokens
+  if (params.stream !== undefined) adapted.stream = params.stream
+  return adapted
+}
+
+const adaptImageRequest = (params) => {
+  const adapted = {
+    model: params.model,
+    prompt: params.prompt
+  }
+  if (params.size) adapted.size = params.size
+  if (params.n) adapted.n = params.n
+  if (params.quality) adapted.quality = params.quality
+  if (params.style) adapted.style = params.style
+  if (params.image) adapted.image = params.image
+  return adapted
+}
+
+const normalizeVideoStatus = (status) => {
+  if (!status) return ''
+  return String(status).toLowerCase()
+}
+
+const extractVideoUrl = (response) => {
+  const candidates = [
+    response?.url,
+    response?.video_url,
+    response?.output_video_url,
+    response?.data?.url,
+    response?.data?.video_url,
+    response?.data?.output_video_url,
+    response?.data?.[0]?.url,
+    response?.data?.[0]?.video_url,
+    response?.result?.url,
+    response?.result?.video_url,
+    response?.content?.video_url,
+    response?.content?.url
+  ]
+  return candidates.find(Boolean) || ''
+}
+
+const extractTaskPayload = (response) => {
+  return response?.data?.[0]
+    || response?.data?.items?.[0]
+    || response?.items?.[0]
+    || response?.tasks?.[0]
+    || response?.task
+    || response?.data
+    || response
+}
+
+const adaptVideoResponse = (response) => {
+  const payload = extractTaskPayload(response)
+  return {
+    ...response,
+    ...payload,
+    status: normalizeVideoStatus(
+      payload?.status
+      || payload?.task_status
+      || payload?.state
+      || response?.status
+      || response?.task_status
+      || response?.state
+    ),
+    url: extractVideoUrl(payload) || extractVideoUrl(response)
+  }
+}
+
+const adaptVideoRequest = (params) => {
+  const model = params.model || ''
+
+  // Seedance 模型 - 使用 content 数组格式
+  if (model.includes('seedance')) {
+    const content = []
+
+    // 构建完整参数文本
+    // 格式: prompt --resolution 720p --ratio 16:9 --dur 5 --fps 24 --wm true --seed 11 --cf false
+    let textPrompt = params.prompt || ''
+
+    // 添加 resolution 参数
+    if (params.resolution) {
+      textPrompt += ` --resolution ${params.resolution}`
+    }
+
+    // 添加 ratio 参数 (图生视频用 16:9)
+    if (params.size) {
+      textPrompt += ` --ratio ${params.size}`
+    }
+
+    // 添加 duration 参数
+    if (params.seconds) {
+      textPrompt += ` --dur ${params.seconds}`
+    }
+
+    // 添加 fps (固定 24)
+    textPrompt += ` --fps 24`
+
+    // 添加水印参数 (默认 true)
+    textPrompt += ` --wm ${params.wm !== false ? 'true' : 'false'}`
+
+    // 添加 seed 参数 (可选)
+    if (params.seed !== undefined) {
+      textPrompt += ` --seed ${params.seed}`
+    }
+
+    // 添加 cf 参数 (默认 false)
+    textPrompt += ` --cf ${params.cf === true ? 'true' : 'false'}`
+
+    content.push({
+      type: 'text',
+      text: textPrompt
+    })
+
+    // 添加参考图（如果有）
+    if (params.first_frame_image) {
+      content.push({
+        type: 'image_url',
+        image_url: {
+          url: params.first_frame_image
+        }
+      })
+    }
+
+    const adapted = {
+      model,
+      content,
+      generate_audio: params.generateAudio !== false
+    }
+
+    if (params.reference_audio) adapted.reference_audio = params.reference_audio
+    return adapted
+  }
+
+  // Kling 模型 - 使用 kling 特定格式
+  if (model.includes('kling')) {
+    // 将 ratio 转换为 aspect_ratio 格式
+    const ratioMap = {
+      '16:9': '16:9',
+      '9:16': '9:16',
+      '1:1': '1:1',
+      '4:3': '4:3',
+      '3:4': '3:4'
+    }
+
+    const adapted = {
+      model_name: model,
+      mode: 'std',
+      prompt: params.prompt || '',
+      aspect_ratio: ratioMap[params.size] || '16:9',
+      duration: params.seconds || 5,
+      negative_prompt: '',
+      cfg_scale: 0.5
+    }
+
+    // 添加参考图（如果有）
+    if (params.first_frame_image) {
+      adapted.image = params.first_frame_image
+    }
+    if (params.reference_audio) adapted.reference_audio = params.reference_audio
+
+    return adapted
+  }
+
+  // 默认格式（veo 等）
+  const adapted = {
+    model: params.model,
+    prompt: params.prompt || ''
+  }
+  if (params.first_frame_image) adapted.first_frame_image = params.first_frame_image
+  if (params.last_frame_image) adapted.last_frame_image = params.last_frame_image
+  if (params.size) adapted.size = params.size
+  if (params.seconds) adapted.seconds = params.seconds
+  if (params.reference_audio) adapted.reference_audio = params.reference_audio
+
+  return adapted
+}
+
 // 渠道适配配置
 export const PROVIDERS = {
   chatfire: {
@@ -17,133 +200,9 @@ export const PROVIDERS = {
     },
     // 火宝渠道请求适配
     requestAdapter: {
-      chat: (params) => {
-        const adapted = {
-          model: params.model,
-          messages: params.messages
-        }
-        if (params.temperature !== undefined) adapted.temperature = params.temperature
-        if (params.max_tokens !== undefined) adapted.max_tokens = params.max_tokens
-        if (params.stream !== undefined) adapted.stream = params.stream
-        return adapted
-      },
-      image: (params) => {
-        const adapted = {
-          model: params.model,
-          prompt: params.prompt
-        }
-        if (params.size) adapted.size = params.size
-        if (params.n) adapted.n = params.n
-        if (params.quality) adapted.quality = params.quality
-        if (params.style) adapted.style = params.style
-        if (params.image) adapted.image = params.image
-        return adapted
-      },
-      video: (params) => {
-        const model = params.model || ''
-
-        // Seedance 模型 - 使用 content 数组格式
-        if (model.includes('seedance')) {
-          const content = []
-
-          // 构建完整参数文本
-          // 格式: prompt --resolution 720p --ratio 16:9 --dur 5 --fps 24 --wm true --seed 11 --cf false
-          let textPrompt = params.prompt || ''
-
-          // 添加 resolution 参数
-          if (params.resolution) {
-            textPrompt += ` --resolution ${params.resolution}`
-          }
-
-          // 添加 ratio 参数 (图生视频用 16:9)
-          if (params.size) {
-            textPrompt += ` --ratio ${params.size}`
-          }
-
-          // 添加 duration 参数
-          if (params.seconds) {
-            textPrompt += ` --dur ${params.seconds}`
-          }
-
-          // 添加 fps (固定 24)
-          textPrompt += ` --fps 24`
-
-          // 添加水印参数 (默认 true)
-          textPrompt += ` --wm ${params.wm !== false ? 'true' : 'false'}`
-
-          // 添加 seed 参数 (可选)
-          if (params.seed !== undefined) {
-            textPrompt += ` --seed ${params.seed}`
-          }
-
-          // 添加 cf 参数 (默认 false)
-          textPrompt += ` --cf ${params.cf === true ? 'true' : 'false'}`
-
-          content.push({
-            type: 'text',
-            text: textPrompt
-          })
-
-          // 添加参考图（如果有）
-          if (params.first_frame_image) {
-            content.push({
-              type: 'image_url',
-              image_url: {
-                url: params.first_frame_image
-              }
-            })
-          }
-
-          const adapted = {
-            model: model,
-            content: content,
-            generate_audio: params.generateAudio !== false
-          }
-
-          return adapted
-        }
-
-        // Kling 模型 - 使用 kling 特定格式
-        if (model.includes('kling')) {
-          // 将 ratio 转换为 aspect_ratio 格式
-          const ratioMap = {
-            '16:9': '16:9',
-            '9:16': '9:16',
-            '1:1': '1:1',
-            '4:3': '4:3',
-            '3:4': '3:4'
-          }
-
-          const adapted = {
-            model_name: model,
-            mode: 'std',
-            prompt: params.prompt || '',
-            aspect_ratio: ratioMap[params.size] || '16:9',
-            duration: params.seconds || 5,
-            negative_prompt: '',
-            cfg_scale: 0.5
-          }
-
-          // 添加参考图（如果有）
-          if (params.first_frame_image) {
-            adapted.image = params.first_frame_image
-          }
-
-          return adapted
-        }
-
-        // 默认格式（veo 等）
-        const adapted = {
-          model: params.model,
-          prompt: params.prompt || ''
-        }
-        if (params.first_frame_image) adapted.first_frame_image = params.first_frame_image
-        if (params.last_frame_image) adapted.last_frame_image = params.last_frame_image
-        if (params.size) adapted.size = params.size
-        if (params.seconds) adapted.seconds = params.seconds
-
-        return adapted
-      }
+      chat: adaptChatRequest,
+      image: adaptImageRequest,
+      video: adaptVideoRequest
     },
     // 火宝渠道响应格式
     responseAdapter: {
@@ -160,12 +219,7 @@ export const PROVIDERS = {
           revisedPrompt: item.revised_prompt || ''
         }))
       },
-      video: (response) => {
-        return {
-          url: response.data?.url || response.url || response.data?.[0]?.url || '',
-          ...response
-        }
-      }
+      video: adaptVideoResponse
     }
   },
   openai: {
@@ -180,29 +234,8 @@ export const PROVIDERS = {
     },
     // 请求参数适配
     requestAdapter: {
-      chat: (params) => {
-        const adapted = {
-          model: params.model,
-          messages: params.messages
-        }
-        // 添加可选参数
-        if (params.temperature !== undefined) adapted.temperature = params.temperature
-        if (params.max_tokens !== undefined) adapted.max_tokens = params.max_tokens
-        if (params.stream !== undefined) adapted.stream = params.stream
-        return adapted
-      },
-      image: (params) => {
-        const adapted = {
-          model: params.model,
-          prompt: params.prompt
-        }
-        if (params.size) adapted.size = params.size
-        if (params.n) adapted.n = params.n
-        if (params.quality) adapted.quality = params.quality
-        if (params.style) adapted.style = params.style
-        if (params.image) adapted.image = params.image
-        return adapted
-      },
+      chat: adaptChatRequest,
+      image: adaptImageRequest,
       video: (params) => {
         const adapted = {
           model: params.model,
@@ -212,6 +245,7 @@ export const PROVIDERS = {
         if (params.last_frame_image) adapted.last_frame_image = params.last_frame_image
         if (params.size) adapted.size = params.size
         if (params.seconds) adapted.seconds = params.seconds
+        if (params.reference_audio) adapted.reference_audio = params.reference_audio
         return adapted
       }
     },
@@ -230,12 +264,38 @@ export const PROVIDERS = {
           revisedPrompt: item.revised_prompt || ''
         }))
       },
-      video: (response) => {
-        return {
-          url: response.data?.url || response.url || response.data?.[0]?.url || '',
-          ...response
+      video: adaptVideoResponse
+    }
+  },
+  volc: {
+    label: '火山引擎 (Volc)',
+    defaultBaseUrl: 'https://ark.cn-beijing.volces.com',
+    endpoints: {
+      chat: '/api/v3/chat/completions',
+      image: '/api/v3/images/generations',
+      video: '/api/v3/contents/generations/tasks',
+      videoQuery: '/api/v3/contents/generations/tasks/{taskId}'
+    },
+    requestAdapter: {
+      chat: adaptChatRequest,
+      image: adaptImageRequest,
+      video: adaptVideoRequest
+    },
+    responseAdapter: {
+      chat: (response) => {
+        if (response.choices && response.choices.length > 0) {
+          return response.choices[0].message?.content || ''
         }
-      }
+        return ''
+      },
+      image: (response) => {
+        const data = response.data || response
+        return (Array.isArray(data) ? data : [data]).map(item => ({
+          url: item.url || item.b64_json || '',
+          revisedPrompt: item.revised_prompt || ''
+        }))
+      },
+      video: adaptVideoResponse
     }
   },
 

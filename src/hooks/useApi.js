@@ -224,6 +224,25 @@ export const useVideoGeneration = () => {
     percentage: 0
   })
 
+  const getNormalizedStatus = (result = {}) => {
+    const rawStatus = result.status || result.task_status || result.state || result.data?.status || result.data?.task_status || result.data?.state
+    return rawStatus ? String(rawStatus).toLowerCase() : ''
+  }
+
+  const getVideoUrlFromResult = (result = {}) => {
+    return result.url
+      || result.video_url
+      || result.output_video_url
+      || result.data?.url
+      || result.data?.video_url
+      || result.data?.output_video_url
+      || result.data?.[0]?.url
+      || result.data?.items?.[0]?.url
+      || result.content?.video_url
+      || result.result?.video_url
+      || ''
+  }
+
   /**
    * Create video task only (no polling) | 仅创建视频任务（不轮询）
    */
@@ -240,6 +259,7 @@ export const useVideoGeneration = () => {
     if (params.last_frame_image) requestData.last_frame_image = params.last_frame_image
     if (params.ratio) requestData.size = params.ratio
     if (params.dur) requestData.seconds = params.dur
+    if (params.reference_audio) requestData.reference_audio = params.reference_audio
 
     // 适配请求参数
     const adaptedParams = adaptRequest('video', requestData)
@@ -254,15 +274,16 @@ export const useVideoGeneration = () => {
     const isAsync = modelConfig?.async !== false
 
     // If has video URL directly, return | 如果直接有视频 URL，返回
-    if (!isAsync || task.data?.url || task.url || task.content?.video_url) {
+    const directUrl = getVideoUrlFromResult(task)
+    if (!isAsync || directUrl) {
       return {
         taskId: null,
-        url: task.data?.url || task.url || task.content?.video_url
+        url: directUrl
       }
     }
 
     // Get task ID | 获取任务 ID
-    const newTaskId = task.id || task.task_id || task.taskId
+    const newTaskId = task.id || task.task_id || task.taskId || task.data?.id || task.data?.task_id || task.data?.taskId
     if (!newTaskId) {
       throw new Error('未获取到任务 ID')
     }
@@ -293,14 +314,18 @@ export const useVideoGeneration = () => {
       // 适配轮询响应
       const adaptedResult = adaptResponse('video', result)
 
+      const normalizedStatus = getNormalizedStatus(adaptedResult)
+      const videoUrl = getVideoUrlFromResult(adaptedResult) || getVideoUrlFromResult(result)
+      const successStatuses = ['completed', 'succeeded', 'success']
+      const failedStatuses = ['failed', 'error', 'cancelled', 'canceled', 'expired']
+
       // Check for completion | 检查是否完成
-      if (result.status === 'completed' || result.status === 'succeeded' || result.data) {
-        const videoUrl = adaptedResult.url || result.data?.url || result.data?.[0]?.url || result.url || result.content?.video_url || result.video_url
-        return { ...adaptedResult, url: videoUrl,  }
+      if (videoUrl || successStatuses.includes(normalizedStatus)) {
+        return { ...adaptedResult, status: normalizedStatus, url: videoUrl }
       }
 
       // Check for failure | 检查是否失败
-      if (result.status === 'failed' || result.status === 'error') {
+      if (failedStatuses.includes(normalizedStatus)) {
         throw new Error(result.error?.message || result.message || '视频生成失败')
       }
 
